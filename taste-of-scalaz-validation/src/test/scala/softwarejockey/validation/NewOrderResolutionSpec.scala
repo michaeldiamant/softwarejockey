@@ -3,17 +3,27 @@ package softwarejockey.validation
 import org.specs2.mutable.Specification
 import org.specs2.mock.Mockito
 import util.Random._
+import org.specs2.execute.{Result, Success}
 
-class NewOrderValidatorSpec extends Specification with Mockito with NewOrderResolutionErrors {
+class NewOrderResolutionSpec extends Specification with Mockito with NewOrderResolutionErrors {
   isolated
 
   "NewOrderResolver" should {
+
+    implicit def examplesToResult(examples: List[org.specs2.specification.Example]) =
+      examples.foldLeft[Result](Success(m = "", expNb = 0))((previousResult, example) => example.body().and(previousResult))
 
     val mockSymbolDao = mock[SymbolDao]
     val mockMarketMakerDao = mock[MarketMakerDao]
     val mockMarketTakerDao = mock[MarketTakerDao]
 
-    val validator = new NewOrderResolver {
+    val javaStyleValidator = new JavaStyleNewOrderResolver {
+      val symbolDao = mockSymbolDao
+      val marketMakerDao = mockMarketMakerDao
+      val marketTakerDao = mockMarketTakerDao
+    }
+
+    val validationStyleValidator = new MonadicStyleNewOrderResolver {
       val symbolDao = mockSymbolDao
       val marketMakerDao = mockMarketMakerDao
       val marketTakerDao = mockMarketTakerDao
@@ -33,38 +43,60 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
 
     def randomSymbol = Symbol(name = nextString(6))
 
-    def verifyResolutionError(expectedError: String)(implicit order: NewOrder) =
-      validator.resolve(order).fold(
+    def verifyJavaStyleResolutionError(expectedError: String)(implicit order: NewOrder) =
+      javaStyleValidator.resolve(order).fold(
         error => error must_== expectedError,
         resolvedOrder => failure("Expected resolution error")
       )
 
+    def verifyValidationStyleResolutionError(expectedError: String)(implicit order: NewOrder) =
+      validationStyleValidator.resolve(order).fold(
+        error => error must_== expectedError,
+        resolvedOrder => failure("Expected resolution error")
+      )
+
+    val UsingJavaStyleResolver = "using Java style resolver"
+    val UsingMonadicStyleResolver = "using monadic style resolver"
+
     "resolve valid new order" >> {
-      implicit val order = randomNewOrder
+      val order = randomNewOrder
+
       val symbol = Symbol(name = order.symbolName)
       val marketMaker = MarketMaker(externalId = order.marketMakerId)
       val account = TradingAccount(order.accountId)
       val marketTaker = MarketTaker(
         externalId = order.marketTakerId,
         accounts = (List.fill(10)(randomAccount) ++ List(account)).toSet,
-        symbols = (List.fill(10)(randomSymbol) ++ List(Symbol(order.symbolName))).toSet
+        symbols = (List.fill(10)(randomSymbol) ++ List(symbol)).toSet
       )
 
       mockSymbolDao.findByName(order.symbolName) returns Some(symbol)
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns Some(marketTaker)
       mockMarketMakerDao.findByExternalId(order.marketMakerId) returns Some(marketMaker)
 
-      validator.resolve(order).fold(
-        error => failure("Unexpected error = " + error),
-        resolvedOrder => {
-          resolvedOrder.account must_== account
-          resolvedOrder.symbol must_== symbol
-          resolvedOrder.marketMaker must_== marketMaker
-          resolvedOrder.price must_== order.price
-          resolvedOrder.quantity must_== order.quantity
-          resolvedOrder.side must_== order.side
-        }
-      )
+
+      def verifyOrder(resolvedOrder: ResolvedNewOrder) = {
+        resolvedOrder.account must_== account
+        resolvedOrder.symbol must_== symbol
+        resolvedOrder.marketMaker must_== marketMaker
+        resolvedOrder.price must_== order.price
+        resolvedOrder.quantity must_== order.quantity
+        resolvedOrder.side must_== order.side
+      }
+
+      "using Java style resolver" >> {
+        javaStyleValidator.resolve(order).fold(
+          error => failure("Unexpected error = " + error),
+          resolvedOrder => verifyOrder(resolvedOrder)
+        )
+      }
+
+      "using Validation style resolver" >> {
+        validationStyleValidator.resolve(order).fold(
+          error => failure("Unexpected error = " + error),
+          resolvedOrder => verifyOrder(resolvedOrder)
+        )
+      }
     }
 
     "fail resolution provided unknown symbol" >> {
@@ -72,7 +104,13 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
 
       mockSymbolDao.findByName(order.symbolName) returns None
 
-      verifyResolutionError(expectedError = UnknownSymbol)
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = UnknownSymbol)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = UnknownSymbol)
+      }
     }
 
     "fail resolution provided unknown market taker ID" >> {
@@ -81,7 +119,13 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
       mockSymbolDao.findByName(order.symbolName) returns Some(randomSymbol)
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns None
 
-      verifyResolutionError(expectedError = UnknownMarketTakerId)
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = UnknownMarketTakerId)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = UnknownMarketTakerId)
+      }
     }
 
     "fail resolution provided unauthorized account" >> {
@@ -95,7 +139,13 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
       )
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns Some(marketTaker)
 
-      verifyResolutionError(expectedError = UnauthorizedAccount)
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = UnauthorizedAccount)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = UnauthorizedAccount)
+      }
     }
 
     "fail resolution provided unknown market maker ID" >> {
@@ -110,7 +160,13 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns Some(marketTaker)
       mockMarketMakerDao.findByExternalId(order.marketMakerId) returns None
 
-      verifyResolutionError(expectedError = UnknownMarketMakerId)
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = UnknownMarketMakerId)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = UnknownMarketMakerId)
+      }
     }
 
     "fail resolution provided unauthorized symbol" >> {
@@ -125,7 +181,13 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns Some(marketTaker)
       mockMarketMakerDao.findByExternalId(order.marketMakerId) returns Some(MarketMaker(order.marketMakerId))
 
-      verifyResolutionError(expectedError = UnauthorizedSymbol)
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = UnauthorizedSymbol)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = UnauthorizedSymbol)
+      }
     }
 
     "fail resolution provided invalid quantity" >> {
@@ -141,7 +203,13 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns Some(marketTaker)
       mockMarketMakerDao.findByExternalId(order.marketMakerId) returns Some(MarketMaker(order.marketMakerId))
 
-      verifyResolutionError(expectedError = InvalidQuantity)
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = InvalidQuantity)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = InvalidQuantity)
+      }
     }
 
     "fail resolution provided invalid price" >> {
@@ -157,7 +225,14 @@ class NewOrderValidatorSpec extends Specification with Mockito with NewOrderReso
       mockMarketTakerDao.findByExternalId(order.marketTakerId) returns Some(marketTaker)
       mockMarketMakerDao.findByExternalId(order.marketMakerId) returns Some(MarketMaker(order.marketMakerId))
 
-      verifyResolutionError(expectedError = InvalidPrice)
+
+      UsingJavaStyleResolver >> {
+        verifyJavaStyleResolutionError(expectedError = InvalidPrice)
+      }
+
+      UsingMonadicStyleResolver >> {
+        verifyValidationStyleResolutionError(expectedError = InvalidPrice)
+      }
     }
   }
 }
