@@ -64,7 +64,6 @@ trait JavaStyleNewOrderResolver extends NewOrderResolutionErrors {
       )
     )
   }
-
 }
 
 trait MonadicStyleNewOrderResolver extends NewOrderResolutionErrors {
