@@ -1,4 +1,4 @@
-package softwarejockey.validation
+package softwarejockey.orderresolution
 
 import scalaz._
 import Scalaz._

@@ -1,4 +1,4 @@
-name := "taste-of-scalaz-validation"
+name := "taste-of-monadic-design"
 
 version := "0.0.1-SNAPSHOT"
 

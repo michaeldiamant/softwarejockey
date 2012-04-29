@@ -3,8 +3,8 @@ import Keys._
 
 object SoftwareJockeyBuild extends Build {
 
-  lazy val root = Project(id = "softwarejockey", base = file(".")) aggregate(tasteOfScalazValidation)
+  lazy val root = Project(id = "softwarejockey", base = file(".")) aggregate(tasteOfMonadicDesign)
 
-  val tasteOfScalazValidation = Project(id = "tasete-of-scalaz-validation", base = file("taste-of-scalaz-validation"))
+  val tasteOfMonadicDesign = Project(id = "tasete-of-monadic-design", base = file("taste-of-monadic-design"))
 }
 

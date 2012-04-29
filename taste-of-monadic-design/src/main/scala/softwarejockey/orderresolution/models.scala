@@ -1,4 +1,4 @@
-package softwarejockey.validation
+package softwarejockey.orderresolution
 
 case class MarketMaker(externalId: String)
 

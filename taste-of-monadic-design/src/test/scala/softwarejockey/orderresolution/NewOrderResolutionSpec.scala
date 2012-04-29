@@ -1,9 +1,10 @@
-package softwarejockey.validation
+package softwarejockey.orderresolution
 
 import org.specs2.mutable.Specification
 import org.specs2.mock.Mockito
 import util.Random._
 import org.specs2.execute.{Result, Success}
+import softwarejockey.orderresolution._
 
 class NewOrderResolutionSpec extends Specification with Mockito with NewOrderResolutionErrors {
   isolated
