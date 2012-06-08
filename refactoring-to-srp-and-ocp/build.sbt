@@ -1,4 +1,4 @@
-name := "softwarejockey"
+name := "refactoring-to-srp-and-ocp"
 
 version := "0.0.1-SNAPSHOT"
 
