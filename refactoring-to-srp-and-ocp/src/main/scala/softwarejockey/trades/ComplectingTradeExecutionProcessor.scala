@@ -20,7 +20,7 @@ trait ComplectingTradeExecutionProcessor extends TradeExecutionProcessor with Ma
 
       val markedUpVolumeExecutionPrice = (requestedTrade.volume <= markupVolumeThreshold)
         .option(addMarkup(requestedTrade.side, markedUpSymbolExecutionPrice, volumeMarkup))
-        .getOrElse(executionPrice)
+        .getOrElse(markedUpSymbolExecutionPrice)
 
       ExecutedTrade(
         requestId = requestedTrade.id,
